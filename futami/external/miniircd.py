@@ -569,7 +569,8 @@ class Client(object):
     def disconnect(self, quitmsg):
         self.message("ERROR :%s" % quitmsg)
         logger.info(
-            "Disconnected connection from %s:%s (%s).", self.host, self.port, quitmsg)
+            "Disconnected connection from %s:%s (%s).",
+            self.host, self.port, quitmsg)
         self.socket.close()
         self.server.remove_client(self, quitmsg)
 
@@ -754,7 +755,8 @@ class Server(object):
         if self.setuid:
             os.setgid(self.setuid[1])
             os.setuid(self.setuid[0])
-            logger.info("Setting uid:gid to %s:%s", self.setuid[0], self.setuid[1])
+            logger.info("Setting uid:gid to %s:%s",
+                        self.setuid[0], self.setuid[1])
         last_aliveness_check = time.time()
         while True:
             clientsockets = [x.socket for x in list(self.clients.values())]
@@ -783,7 +785,8 @@ class Server(object):
                                 addr[0], addr[1], e)
                             continue
                     self.clients[conn] = Client(self, conn)
-                    logger.info("Accepted connection from %s:%s.", addr[0], addr[1])
+                    logger.info("Accepted connection from %s:%s.",
+                                addr[0], addr[1])
             for x in owtd:
                 if x in self.clients:  # client may have been disconnected
                     self.clients[x].socket_writable_notification()
