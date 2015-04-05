@@ -813,7 +813,7 @@ def irc_lower(s):
     return str.translate(s, _ircstring_translation)
 
 
-def main(argv):
+def parse_options(argv):
     op = OptionParser(
         version=VERSION,
         description="miniircd is a small and limited IRC server.")
@@ -909,13 +909,4 @@ def main(argv):
         except ValueError:
             op.error("bad port: %r" % port)
     options.ports = ports
-    server = Server(options)
-    if options.daemon:
-        server.daemonize()
-    try:
-        server.start()
-    except KeyboardInterrupt:
-        server.print_error("Interrupted.")
-
-
-main(sys.argv)
+    return options
