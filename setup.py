@@ -26,6 +26,7 @@ setup(
         'pyflakes==0.8.1',
         'nose==1.3.4',
     ],
+    test_suite = 'nose.collector',
     entry_points={
         'console_scripts': [
             'ami-server=futami.ami:main',
