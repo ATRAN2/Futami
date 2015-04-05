@@ -28,7 +28,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'sample=sample:main',
+            'ami-server=futami.ami:main',
         ],
     },
 )
