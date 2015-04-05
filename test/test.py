@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os
+import multiprocessing
 import re
 import shutil
 import signal
@@ -9,27 +9,29 @@ import tempfile
 import time
 from nose.tools import assert_not_in, assert_true
 
+from futami.ami import AmiServer
+from futami.external import miniircd
+
 SERVER_PORT = 16667
 
 
 class ServerFixture(object):
     def setUp(self, persistent=False):
+        arguments = [
+            "miniircd",
+            "--ports=%d" % SERVER_PORT,
+            ]
+
         if persistent:
             self.state_dir = tempfile.mkdtemp()
+            arguments.append("--statedir=%s" % self.state_dir)
         else:
             self.state_dir = None
-        pid = os.fork()
-        if pid == 0:
-            # Child.
-            arguments = [
-                "miniircd",
-                "--ports=%d" % SERVER_PORT,
-                ]
-            if persistent:
-                arguments.append("--statedir=%s" % self.state_dir)
-            os.execv("../futami/external/miniircd.py", arguments)
-        # Parent.
-        self.child_pid = pid
+
+        options = miniircd.parse_options(arguments)
+        self.server = AmiServer(options)
+        self.server_process = multiprocessing.Process(target=self.server.start)
+        self.server_process.start()
         self.connections = {}  # nick -> fp
 
     def connect(self, nick):
@@ -54,8 +56,8 @@ class ServerFixture(object):
         self.expect(nick, r":local\S+ 422 %s :.*" % nick)
 
     def shutDown(self):
-        os.kill(self.child_pid, signal.SIGTERM)
-        os.waitpid(self.child_pid, 0)
+        self.server_process.terminate()
+
         if self.state_dir:
             try:
                 shutil.rmtree(self.state_dir)
