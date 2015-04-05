@@ -544,8 +544,7 @@ class Client(object):
             data = ""
             quitmsg = x
         except UnicodeDecodeError as x:
-            data = ""
-            quitmsg = x
+            return
         if data:
             self.__readbuffer += data
             self.__parse_read_buffer()
