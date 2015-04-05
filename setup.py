@@ -19,7 +19,12 @@ setup(
     keywords='4chan IRC bridge',
     packages=find_packages(),
     install_requires=[
-        'requests==2.6',
+        'requests==2.6.0',
+    ],
+    tests_require=[
+        'pep8==1.6.2',
+        'pyflakes==0.8.1',
+        'nose==1.3.4',
     ],
     entry_points={
         'console_scripts': [
