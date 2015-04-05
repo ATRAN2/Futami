@@ -20,6 +20,7 @@
 #
 # Joel Rosdahl <joel@rosdahl.net>
 
+import logging
 import os
 import re
 import select
@@ -31,6 +32,9 @@ from datetime import datetime
 from optparse import OptionParser
 
 VERSION = "0.4"
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_directory(path):
@@ -633,7 +637,12 @@ class Client(object):
 
 
 class Server(object):
+
     def __init__(self, options):
+        if options.debug:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
         self.ports = options.ports
         self.password = options.password
         self.ssl_pem_file = options.ssl_pem_file
