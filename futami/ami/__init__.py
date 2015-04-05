@@ -20,4 +20,4 @@ def main():
     try:
         server.start()
     except KeyboardInterrupt:
-        server.print_error("Interrupted.")
+        logging.error("Interrupted.")
