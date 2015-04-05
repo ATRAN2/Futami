@@ -20,8 +20,6 @@
 #
 # Joel Rosdahl <joel@rosdahl.net>
 
-VERSION = "0.4"
-
 import os
 import re
 import select
@@ -31,6 +29,8 @@ import tempfile
 import time
 from datetime import datetime
 from optparse import OptionParser
+
+VERSION = "0.4"
 
 
 def create_directory(path):
@@ -649,8 +649,7 @@ class Server(object):
             self.address = socket.gethostbyname(options.listen)
         else:
             self.address = ""
-        self.name = socket.getfqdn(self.address)[:63]  # Server name limit from
-                                                       # the RFC.
+        self.name = socket.getfqdn(self.address)[:63]  # RFC 2813 2.1
 
         self.channels = {}  # irc_lower(Channel name) --> Channel instance.
         self.clients = {}  # Socket --> Client instance.
@@ -766,8 +765,9 @@ class Server(object):
                             % (self.setuid[0], self.setuid[1]))
         last_aliveness_check = time.time()
         while True:
+            clientsockets = [x.socket for x in list(self.clients.values())]
             (iwtd, owtd, ewtd) = select.select(
-                serversockets + [x.socket for x in list(self.clients.values())],
+                serversockets + clientsockets,
                 [x.socket for x in list(self.clients.values())
                  if x.write_queue_size() > 0],
                 [],
