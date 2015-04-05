@@ -10,7 +10,7 @@ class AmiServer(miniircd.Server):
 
 def main():
     logging.basicConfig(
-        format='%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s',
+        format='%(asctime)s %(process)d %(module)s [%(levelname)s] %(message)s',
     )
     options = miniircd.parse_options(sys.argv)
     server = AmiServer(options)

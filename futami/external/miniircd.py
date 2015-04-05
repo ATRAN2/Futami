@@ -542,8 +542,7 @@ class Client(object):
     def socket_readable_notification(self):
         try:
             data = self.socket.recv(2 ** 10).decode('utf-8')
-            self.server.print_debug(
-                "[%s:%d] -> %r" % (self.host, self.port, data))
+            logger.debug('[%s:%d] -> %r', self.host, self.port, data)
             quitmsg = "EOT"
         except socket.error as x:
             data = ""
@@ -561,18 +560,16 @@ class Client(object):
     def socket_writable_notification(self):
         try:
             sent = self.socket.send(self.__writebuffer.encode('utf-8'))
-            self.server.print_debug(
-                "[%s:%d] <- %r" % (
-                    self.host, self.port, self.__writebuffer[:sent]))
+            logger.debug('[%s:%d] <- %r',
+                         self.host, self.port, self.__writebuffer[:sent])
             self.__writebuffer = self.__writebuffer[sent:]
         except socket.error as x:
             self.disconnect(x)
 
     def disconnect(self, quitmsg):
         self.message("ERROR :%s" % quitmsg)
-        self.server.print_info(
-            "Disconnected connection from %s:%s (%s)." % (
-                self.host, self.port, quitmsg))
+        logger.info(
+            "Disconnected connection from %s:%s (%s).", self.host, self.port, quitmsg)
         self.socket.close()
         self.server.remove_client(self, quitmsg)
 
@@ -679,7 +676,7 @@ class Server(object):
         try:
             pid = os.fork()
             if pid > 0:
-                self.print_info("PID: %d" % pid)
+                logger.info("PID: %d", pid)
                 sys.exit(0)
         except OSError:
             sys.exit(1)
@@ -713,19 +710,6 @@ class Server(object):
         else:
             return []
 
-    def print_info(self, msg):
-        if self.verbose:
-            print(msg)
-            sys.stdout.flush()
-
-    def print_debug(self, msg):
-        if self.debug:
-            print(msg)
-            sys.stdout.flush()
-
-    def print_error(self, msg):
-        sys.stderr.write("%s\n" % msg)
-
     def client_changed_nickname(self, client, oldnickname):
         if oldnickname:
             del self.nicknames[irc_lower(oldnickname)]
@@ -757,21 +741,20 @@ class Server(object):
             try:
                 s.bind((self.address, port))
             except socket.error as e:
-                self.print_error("Could not bind port %s: %s." % (port, e))
+                logger.error("Could not bind port %s: %s.", port, e)
                 sys.exit(1)
             s.listen(5)
             serversockets.append(s)
             del s
-            self.print_info("Listening on port %d." % port)
+            logger.info("Listening on port %d.", port)
         if self.chroot:
             os.chdir(self.chroot)
             os.chroot(self.chroot)
-            self.print_info("Changed root directory to %s" % self.chroot)
+            logger.info("Changed root directory to %s", self.chroot)
         if self.setuid:
             os.setgid(self.setuid[1])
             os.setuid(self.setuid[0])
-            self.print_info("Setting uid:gid to %s:%s"
-                            % (self.setuid[0], self.setuid[1]))
+            logger.info("Setting uid:gid to %s:%s", self.setuid[0], self.setuid[1])
         last_aliveness_check = time.time()
         while True:
             clientsockets = [x.socket for x in list(self.clients.values())]
@@ -795,13 +778,12 @@ class Server(object):
                                 certfile=self.ssl_pem_file,
                                 keyfile=self.ssl_pem_file)
                         except ssl.SSLError as e:
-                            self.print_error(
-                                "SSL error for connection from %s:%s: %s" % (
-                                    addr[0], addr[1], e))
+                            logger.error(
+                                "SSL error for connection from %s:%s: %s",
+                                addr[0], addr[1], e)
                             continue
                     self.clients[conn] = Client(self, conn)
-                    self.print_info("Accepted connection from %s:%s." % (
-                        addr[0], addr[1]))
+                    logger.info("Accepted connection from %s:%s.", addr[0], addr[1])
             for x in owtd:
                 if x in self.clients:  # client may have been disconnected
                     self.clients[x].socket_writable_notification()
