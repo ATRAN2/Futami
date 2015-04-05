@@ -83,7 +83,8 @@ class Channel(object):
         if not (self._state_path and os.path.exists(self._state_path)):
             return
         data = {}
-        exec(open(self._state_path), {}, data)
+        with open(self._state_path) as f:
+            exec(f.read(), {}, data)
         self._topic = data.get("topic", "")
         self._key = data.get("key")
 
