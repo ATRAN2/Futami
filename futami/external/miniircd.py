@@ -24,12 +24,16 @@ import logging
 import os
 import re
 import select
+import ssl
 import socket
 import sys
 import tempfile
 import time
 from datetime import datetime
 from optparse import OptionParser
+from multiprocessing import Queue
+
+from futami.ami import Ami
 
 VERSION = "0.4"
 
@@ -120,8 +124,8 @@ class Client(object):
         self.realname = None
         (self.host, self.port) = socket.getpeername()
         self.__timestamp = time.time()
-        self.__readbuffer = ""
-        self.__writebuffer = ""
+        self._readbuffer = ""
+        self._writebuffer = ""
         self.__sent_ping = False
         if self.server.password:
             self.__handle_command = self.__pass_handler
@@ -147,11 +151,11 @@ class Client(object):
                 self.disconnect("ping timeout")
 
     def write_queue_size(self):
-        return len(self.__writebuffer)
+        return len(self._writebuffer)
 
     def __parse_read_buffer(self):
-        lines = self.__linesep_regexp.split(self.__readbuffer)
-        self.__readbuffer = lines[-1]
+        lines = self.__linesep_regexp.split(self._readbuffer)
+        self._readbuffer = lines[-1]
         lines = lines[:-1]
         for line in lines:
             if not line:
@@ -550,7 +554,7 @@ class Client(object):
         except UnicodeDecodeError as x:
             return
         if data:
-            self.__readbuffer += data
+            self._readbuffer += data
             self.__parse_read_buffer()
             self.__timestamp = time.time()
             self.__sent_ping = False
@@ -559,10 +563,10 @@ class Client(object):
 
     def socket_writable_notification(self):
         try:
-            sent = self.socket.send(self.__writebuffer.encode('utf-8'))
+            sent = self.socket.send(self._writebuffer.encode('utf-8'))
             logger.debug('[%s:%d] <- %r',
-                         self.host, self.port, self.__writebuffer[:sent])
-            self.__writebuffer = self.__writebuffer[sent:]
+                         self.host, self.port, self._writebuffer[:sent])
+            self._writebuffer = self._writebuffer[sent:]
         except socket.error as x:
             self.disconnect(x)
 
@@ -575,7 +579,7 @@ class Client(object):
         self.server.remove_client(self, quitmsg)
 
     def message(self, msg):
-        self.__writebuffer += msg + "\r\n"
+        self._writebuffer += msg + "\r\n"
 
     def reply(self, msg):
         self.message(":%s %s" % (self.server.name, msg))
@@ -634,6 +638,22 @@ class Client(object):
             self.reply("422 %s :MOTD File is missing" % self.nickname)
 
 
+class InternalClient(Client):
+    def __init__(self, server, nickname, user, host='localhost'):
+        self.server = server
+        self.nickname = nickname
+        self.realname = nickname
+        self.user = user
+        self.host = host
+
+        self._readbuffer = ""
+        self._writebuffer = ""
+
+    @property
+    def socket(self):
+        raise AttributeError('InternalClients have no sockets')
+
+
 class Server(object):
 
     def __init__(self, options):
@@ -665,6 +685,10 @@ class Server(object):
             create_directory(self.logdir)
         if self.statedir:
             create_directory(self.statedir)
+
+        self.update_queue = Queue()
+
+        self.update_agent = Ami(self.update_queue)
 
     def daemonize(self):
         try:
@@ -735,7 +759,7 @@ class Server(object):
         del self.channels[irc_lower(channel.name)]
 
     def start(self):
-        serversockets = []
+        self.server_sockets = []
         for port in self.ports:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -745,8 +769,7 @@ class Server(object):
                 logger.error("Could not bind port %s: %s.", port, e)
                 sys.exit(1)
             s.listen(5)
-            serversockets.append(s)
-            del s
+            self.server_sockets.append(s)
             logger.info("Listening on port %d.", port)
         if self.chroot:
             os.chdir(self.chroot)
@@ -757,44 +780,62 @@ class Server(object):
             os.setuid(self.setuid[0])
             logger.info("Setting uid:gid to %s:%s",
                         self.setuid[0], self.setuid[1])
-        last_aliveness_check = time.time()
+        self.last_aliveness_check = time.time()
+
+        self.run_loop()
+
+
+    def run_loop(self):
+        self.internal_client = InternalClient(self, 'control', 'Control User')
+        control_channel = self.get_channel("#control")
+        control_channel.add_member(self.internal_client)
+
         while True:
-            clientsockets = [x.socket for x in list(self.clients.values())]
-            (iwtd, owtd, ewtd) = select.select(
-                serversockets + clientsockets,
-                [x.socket for x in list(self.clients.values())
-                 if x.write_queue_size() > 0],
+            client_sockets = [client.socket for client in list(self.clients.values())]
+            (readable_sockets, writable_sockets, _) = select.select(
+                self.server_sockets + client_sockets,
+                [client.socket for client in list(self.clients.values())
+                 if client.write_queue_size() > 0],
                 [],
-                10)
-            for x in iwtd:
-                if x in self.clients:
-                    self.clients[x].socket_readable_notification()
+                10
+            )
+
+            for client in readable_sockets:
+                if client in self.clients:
+                    self.clients[client].socket_readable_notification()
                 else:
-                    (conn, addr) = x.accept()
+                    (conn, addr) = client.accept()
                     if self.ssl_pem_file:
-                        import ssl
-                        try:
-                            conn = ssl.wrap_socket(
-                                conn,
-                                server_side=True,
-                                certfile=self.ssl_pem_file,
-                                keyfile=self.ssl_pem_file)
-                        except ssl.SSLError as e:
-                            logger.error(
-                                "SSL error for connection from %s:%s: %s",
-                                addr[0], addr[1], e)
-                            continue
+                        conn = self._maybe_wrap_ssl(conn)
+                    if not conn:
+                        continue
                     self.clients[conn] = Client(self, conn)
                     logger.info("Accepted connection from %s:%s.",
                                 addr[0], addr[1])
-            for x in owtd:
-                if x in self.clients:  # client may have been disconnected
-                    self.clients[x].socket_writable_notification()
+
+            for client in writable_sockets:
+                if client in self.clients:  # client may have been disconnected
+                    self.clients[client].socket_writable_notification()
+
             now = time.time()
-            if last_aliveness_check + 10 < now:
+            if self.last_aliveness_check + 10 < now:
                 for client in list(self.clients.values()):
                     client.check_aliveness()
-                last_aliveness_check = now
+                self.last_aliveness_check = now
+
+    def _maybe_wrap_ssl(self, conn):
+        try:
+            return ssl.wrap_socket(
+                conn,
+                server_side=True,
+                certfile=self.ssl_pem_file,
+                keyfile=self.ssl_pem_file
+            )
+        except ssl.SSLError as e:
+            logger.error(
+                "SSL error for connection from %s:%s: %s",
+                addr[0], addr[1], e)
+            return None
 
 
 _alpha = "abcdefghijklmnopqrstuvwxyz"
