@@ -8,7 +8,6 @@ from multiprocessing import (
     Process,
 )
 from time import sleep
-import json
 
 import requests
 
