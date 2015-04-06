@@ -676,7 +676,6 @@ class InternalClient(Client):
         self.update_agent = Ami(self.update_queue)
 
     def loop_hook(self):
-        logger.debug("firing loop hook")
         while not self.update_queue.empty():
             result = self.update_queue.get()
 
@@ -867,7 +866,7 @@ class Server(object):
                 else:
                     (conn, addr) = client.accept()
                     if self.ssl_pem_file:
-                        conn = self._maybe_wrap_ssl(conn)
+                        conn = self._maybe_wrap_ssl(conn, addr)
                     if not conn:
                         continue
                     self.clients[conn] = Client(self, conn)
@@ -884,7 +883,7 @@ class Server(object):
                     client.check_aliveness()
                 self.last_aliveness_check = now
 
-    def _maybe_wrap_ssl(self, conn):
+    def _maybe_wrap_ssl(self, conn, addr):
         try:
             return ssl.wrap_socket(
                 conn,
