@@ -106,9 +106,9 @@ class Channel(object):
         fp.close()
         os.rename(path, self._state_path)
 
-
     def __repr__(self):
         return "<{} {}>".format(self.__class__.__name__, self.name)
+
 
 class Client(object):
     __linesep_regexp = re.compile(r"\r?\n")
@@ -298,8 +298,6 @@ class Client(object):
                 # client separately.
                 channel.add_member(self.server.internal_client)
                 self.server.internal_client.client_joined(self, channel)
-
-
 
         def list_handler():
 
@@ -662,6 +660,7 @@ class Client(object):
     def __repr__(self):
         return "<{} {}>".format(self.__class__.__name__, self.prefix)
 
+
 class InternalClient(Client):
     def __init__(self, server, nickname, user, host='localhost'):
         self.server = server
@@ -728,8 +727,8 @@ class InternalClient(Client):
         if sending_nick:
             self.nickname = real_nick
 
-class Server(object):
 
+class Server(object):
     def __init__(self, options):
         if options.debug:
             logger.setLevel(logging.DEBUG)
@@ -760,7 +759,6 @@ class Server(object):
             create_directory(self.statedir)
 
         self.internal_client = InternalClient(self, 'control', 'ControlUser')
-
 
     def daemonize(self):
         try:
@@ -845,9 +843,7 @@ class Server(object):
 
         self.run_loop()
 
-
     def run_loop(self):
-
         while True:
             self.internal_client.loop_hook()
 
