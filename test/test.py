@@ -9,7 +9,7 @@ import tempfile
 import time
 from nose.tools import assert_not_in, assert_true
 
-from futami.ami import AmiServer
+from futami.mami import MamiServer
 from futami.external import miniircd
 
 SERVER_PORT = 16667
@@ -29,7 +29,7 @@ class ServerFixture(object):
             self.state_dir = None
 
         options = miniircd.parse_options(arguments)
-        self.server = AmiServer(options)
+        self.server = MamiServer(options)
         self.server_process = multiprocessing.Process(target=self.server.start)
         self.server_process.start()
         self.connections = {}  # nick -> fp

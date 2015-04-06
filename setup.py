@@ -29,7 +29,7 @@ setup(
     test_suite = 'nose.collector',
     entry_points={
         'console_scripts': [
-            'ami-server=futami.ami:main',
+            'mami-server=futami.mami:main',
         ],
     },
 )

@@ -4,7 +4,7 @@ import sys
 from futami.external import miniircd
 
 
-class AmiServer(miniircd.Server):
+class MamiServer(miniircd.Server):
     pass
 
 
@@ -14,7 +14,7 @@ def main():
                 '[%(levelname)s] %(message)s'),
     )
     options = miniircd.parse_options(sys.argv)
-    server = AmiServer(options)
+    server = MamiServer(options)
     if options.daemon:
         server.daemonize()
 
