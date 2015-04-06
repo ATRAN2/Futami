@@ -107,6 +107,9 @@ class Channel(object):
         os.rename(path, self._state_path)
 
 
+    def __repr__(self):
+        return "<{} {}>".format(self.__class__.__name__, self.name)
+
 class Client(object):
     __linesep_regexp = re.compile(r"\r?\n")
     # The RFC limit for nicknames is 9 characters, but what the heck.
@@ -128,13 +131,13 @@ class Client(object):
         self._writebuffer = ""
         self.__sent_ping = False
         if self.server.password:
-            self.__handle_command = self.__pass_handler
+            self._handle_command = self.__pass_handler
         else:
-            self.__handle_command = self.__registration_handler
+            self._handle_command = self.__registration_handler
 
-    def get_prefix(self):
+    @property
+    def prefix(self):
         return "%s!%s@%s" % (self.nickname, self.user, self.host)
-    prefix = property(get_prefix)
 
     def check_aliveness(self):
         now = time.time()
@@ -142,7 +145,7 @@ class Client(object):
             self.disconnect("ping timeout")
             return
         if not self.__sent_ping and self.__timestamp + 90 < now:
-            if self.__handle_command == self.__command_handler:
+            if self._handle_command == self.__command_handler:
                 # Registered.
                 self.message("PING :%s" % self.server.name)
                 self.__sent_ping = True
@@ -153,7 +156,7 @@ class Client(object):
     def write_queue_size(self):
         return len(self._writebuffer)
 
-    def __parse_read_buffer(self):
+    def _parse_read_buffer(self):
         lines = self.__linesep_regexp.split(self._readbuffer)
         self._readbuffer = lines[-1]
         lines = lines[:-1]
@@ -173,7 +176,7 @@ class Client(object):
                     arguments = str.split(y[0])
                     if len(y) == 2:
                         arguments.append(y[1])
-            self.__handle_command(command, arguments)
+            self._handle_command(command, arguments)
 
     def __pass_handler(self, command, arguments):
         server = self.server
@@ -182,7 +185,7 @@ class Client(object):
                 self.reply_461("PASS")
             else:
                 if arguments[0].lower() == server.password:
-                    self.__handle_command = self.__registration_handler
+                    self._handle_command = self.__registration_handler
                 else:
                     self.reply("464 :Password incorrect")
         elif command == "QUIT":
@@ -222,7 +225,7 @@ class Client(object):
                        % (self.nickname, server.name, VERSION))
             self.send_lusers()
             self.send_motd()
-            self.__handle_command = self.__command_handler
+            self._handle_command = self.__command_handler
 
     def __command_handler(self, command, arguments):
         def away_handler():
@@ -259,12 +262,13 @@ class Client(object):
                 if not valid_channel_re.match(channelname):
                     self.reply_403(channelname)
                     continue
-                channel = server.get_channel(channelname)
+                channel = Channel(self.server, channelname)
                 if channel.key is not None and channel.key != keys[i]:
                     self.reply(
                         "475 %s %s :Cannot join channel (+k) - bad key"
                         % (self.nickname, channelname))
                     continue
+
                 channel.add_member(self)
                 self.channels[irc_lower(channelname)] = channel
                 self.message_channel(channel, "JOIN", channelname, True)
@@ -283,14 +287,29 @@ class Client(object):
                 self.reply("366 %s %s :End of NAMES list"
                            % (self.nickname, channelname))
 
+                # Add the internal client first so he sees the join..
+                # You'd think it would make sense to add the internal client
+                # prior and let it handle the join,
+                # but what ends up happening is that it processes the join
+                # and sends a welcome privmsg before we even finish the
+                # bookkeeping, confusing the client. Informing the
+                # internal client should really happen here, and if we can't
+                # act on the standard join we might as well alert the internal
+                # client separately.
+                channel.add_member(self.server.internal_client)
+                self.server.internal_client.client_joined(self, channel)
+
+
+
         def list_handler():
+
             if len(arguments) < 1:
-                channels = list(server.channels.values())
+                channels = list(self.channels.values())
             else:
                 channels = []
                 for channelname in arguments[0].split(","):
-                    if server.has_channel(channelname):
-                        channels.append(server.get_channel(channelname))
+                    if channelname in self.channels:
+                        channels.append(self.channels[channelname])
             channels.sort(key=lambda x: x.name)
             for channel in channels:
                 self.reply("322 %s %s %d :%s"
@@ -306,8 +325,8 @@ class Client(object):
                 self.reply_461("MODE")
                 return
             targetname = arguments[0]
-            if server.has_channel(targetname):
-                channel = server.get_channel(targetname)
+            if targetname in self.channels:
+                channel = self.channels[targetname]
                 if len(arguments) < 2:
                     if channel.key:
                         modes = "+k"
@@ -399,8 +418,8 @@ class Client(object):
             if client:
                 client.message(":%s %s %s :%s"
                                % (self.prefix, command, targetname, message))
-            elif server.has_channel(targetname):
-                channel = server.get_channel(targetname)
+            elif targetname in self.channels:
+                channel = self.channels[targetname]
                 self.message_channel(
                     channel, command, "%s :%s" % (channel.name, message))
                 self.channel_log(channel, message)
@@ -485,8 +504,8 @@ class Client(object):
             if len(arguments) < 1:
                 return
             targetname = arguments[0]
-            if server.has_channel(targetname):
-                channel = server.get_channel(targetname)
+            if targetname in self.channels:
+                channel = self.channels[targetname]
                 for member in channel.members:
                     self.reply("352 %s %s %s %s %s %s H :0 %s"
                                % (self.nickname, targetname, member.user,
@@ -555,7 +574,7 @@ class Client(object):
             return
         if data:
             self._readbuffer += data
-            self.__parse_read_buffer()
+            self._parse_read_buffer()
             self.__timestamp = time.time()
             self.__sent_ping = False
         else:
@@ -593,8 +612,11 @@ class Client(object):
 
     def message_channel(self, channel, command, message, include_self=False):
         line = ":%s %s %s" % (self.prefix, command, message)
+        print(channel.members)
         for client in channel.members:
+            print(self, client, client != self)
             if client != self or include_self:
+                print("Messaging", client)
                 client.message(line)
 
     def channel_log(self, channel, message, meta=False):
@@ -637,6 +659,8 @@ class Client(object):
         else:
             self.reply("422 %s :MOTD File is missing" % self.nickname)
 
+    def __repr__(self):
+        return "<{} {}>".format(self.__class__.__name__, self.prefix)
 
 class InternalClient(Client):
     def __init__(self, server, nickname, user, host='localhost'):
@@ -648,11 +672,62 @@ class InternalClient(Client):
 
         self._readbuffer = ""
         self._writebuffer = ""
+        self.update_queue = Queue()
+        self.update_agent = Ami(self.update_queue)
+
+    def loop_hook(self):
+        logger.debug("firing loop hook")
+        while not self.update_queue.empty():
+            result = self.update_queue.get()
+
+    def _parse_prefix(self, prefix):
+        m = re.search(":(?P<nickname>[^!]*)!(?P<username>[^@]*)@(?P<host>.*)", prefix)
+        return m.groupdict()
 
     @property
     def socket(self):
         raise AttributeError('InternalClients have no sockets')
 
+    def message(self, message):
+        prefix, message = message.split(" ", 1)
+
+        prefix = self._parse_prefix(prefix)
+
+        self.sending_client = self.server.get_client(prefix['nickname'])
+
+        self._readbuffer = message + '\r\n'
+        self._parse_read_buffer()
+
+    def _handle_command(self, command, arguments):
+        sending_client = self.sending_client
+        self.sending_client = None
+
+        # Add handling here for handling actual input from users other than
+        # joins
+
+    def client_joined(self, client, channel):
+        self._send_message(client, channel.name, "Welcome to {}".format(channel.name))
+
+        channel_name = channel.name[1:]
+
+        if not (channel_name.startswith('/') and channel_name.endswith('/')):
+            self._send_message(client, channel.name, "This doesn't look like a board. Nothing will happen in this channel.")
+            return
+
+    def _send_message(self, client, channel, message, sending_nick=None):
+        if sending_nick:
+            real_nick = self.nickname
+            self.nickname = sending_nick
+
+        client.message(
+            ":{} PRIVMSG {} :{}".format(
+                self.prefix,
+                channel,
+                message,
+        ))
+
+        if sending_nick:
+            self.nickname = real_nick
 
 class Server(object):
 
@@ -678,7 +753,6 @@ class Server(object):
             self.address = ""
         self.name = socket.getfqdn(self.address)[:63]  # RFC 2813 2.1
 
-        self.channels = {}  # irc_lower(Channel name) --> Channel instance.
         self.clients = {}  # Socket --> Client instance.
         self.nicknames = {}  # irc_lower(Nickname) --> Client instance.
         if self.logdir:
@@ -686,9 +760,8 @@ class Server(object):
         if self.statedir:
             create_directory(self.statedir)
 
-        self.update_queue = Queue()
+        self.internal_client = InternalClient(self, 'control', 'ControlUser')
 
-        self.update_agent = Ami(self.update_queue)
 
     def daemonize(self):
         try:
@@ -714,17 +787,6 @@ class Server(object):
 
     def get_client(self, nickname):
         return self.nicknames.get(irc_lower(nickname))
-
-    def has_channel(self, name):
-        return irc_lower(name) in self.channels
-
-    def get_channel(self, channelname):
-        if irc_lower(channelname) in self.channels:
-            channel = self.channels[irc_lower(channelname)]
-        else:
-            channel = Channel(self, channelname)
-            self.channels[irc_lower(channelname)] = channel
-        return channel
 
     def get_motd_lines(self):
         if self.motdfile:
@@ -786,11 +848,10 @@ class Server(object):
 
 
     def run_loop(self):
-        self.internal_client = InternalClient(self, 'control', 'Control User')
-        control_channel = self.get_channel("#control")
-        control_channel.add_member(self.internal_client)
 
         while True:
+            self.internal_client.loop_hook()
+
             client_sockets = [client.socket for client in list(self.clients.values())]
             (readable_sockets, writable_sockets, _) = select.select(
                 self.server_sockets + client_sockets,
