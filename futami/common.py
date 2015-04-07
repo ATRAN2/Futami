@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 
 from collections import namedtuple
+from html.parser import HTMLParser
 import enum
+import re
+
+unescape = HTMLParser().unescape
 
 SubscriptionUpdate = namedtuple('SubscriptionUpdate', ['action', 'target'])
 
 BoardTarget = namedtuple('BoardTarget', ['board'])
 
 ThreadTarget = namedtuple('ThreadTarget', ['board', 'thread'])
-
 
 class Action(enum.Enum):
     LoadAndFollow = 1
@@ -63,7 +66,7 @@ class Post:
         'tripcode': 'trip',
         'id': 'id',
         'subject': 'sub',
-        'comment': 'com',
+        'raw_comment': 'com',
         'board': 'board',
     }
 
@@ -103,3 +106,56 @@ class Post:
 
     def __eq__(self, other):
         return isinstance(other, Post) and self.post_no == other.post_no
+
+    @property
+    def comment(self):
+        return self.clean(self.raw_comment)
+
+
+    def clean(self, text):
+        if not text:
+            return text
+
+        # Some text escaping
+        text = re.sub(r'\[(banned|moot)\]', r'[\1:lit]', text)
+
+        # Code tags
+        text = re.sub(r'<pre [^>]*>', r'[code]', text)
+        text = re.sub(r'</pre>', r'[/code]', text)
+
+        # Comment too long, exif tag toggle
+        text = re.sub(r'<span class="abbr">.*?</span>', r'', text)
+
+        # USER WAS * FOR THIS POST
+        text = re.sub(r'<(?:b|strong) style="color:\s*red;">(.*?)</(?:b|strong)>', r'\x0304\1\x0f[/banned]', text)
+
+        # moot text
+        text = re.sub(r'<div style="padding: 5px;margin-left: \.5em;border-color: #faa;border: 2px dashed rgba\(255,0,0,\.1\);border-radius: 2px">(.*?)</div>', r'[moot]\1[/moot]', text)
+
+        # Bold text
+        text = re.sub(r'<(?:b|strong)>(.*?)</(?:b|strong)>', '\x02\1\x02', text)
+
+        # Who are you quoting?
+        text = re.sub(r'<font class="unkfunc">(.*?)</font>', '\x0303\1\x0f', text)
+        text = re.sub(r'<span class="quote">(.*?)</span>', '\x0303\1\x0f', text)
+        text = re.sub(r'<span class="(?:[^"]*)?deadlink">(.*?)</span>', '\x0303\1\x0f', text)
+
+        # Get rid of links
+        text = re.sub(r'<a[^>]*>(.*?)</a>', r'\1', text)
+
+        # Spoilers
+        text = re.sub(r'<span class="spoiler"[^>]*>', '\x0301,01', text)
+        text = re.sub(r'</span>', '\x0f', text)
+
+        text = re.sub(r'<s>', '\x0301,01', text)
+        text = re.sub(r'</s>', '\x0f', text)
+
+        # <wbr>
+        text = re.sub(r'<wbr>', '', text)
+
+        # Newlines
+        text = re.sub(r'<br>', ' ', text)
+
+        text = unescape(text)
+
+        return text
