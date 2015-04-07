@@ -40,8 +40,6 @@ from futami.common import (
     Action,
     BoardTarget,
     SubscriptionUpdate,
-    Post,
-    ThreadTarget,
 )
 
 VERSION = "0.4"
