@@ -700,23 +700,14 @@ class InternalClient(Client):
                 client, channel = result.identifier
                 client = self.server.get_client(client)
 
-<<<<<<< HEAD
-                self._send_message(client, channel, result.comment,
+                self._send_message(client, channel, result.summary,
                                    sending_nick=send_as)
-=======
-                self._send_message(
-                    client,
-                    channel,
-                    result.summary,
-                    sending_nick=send_as
-                )
->>>>>>> Add some retrying behavior to API getting functions, add image and elided text to post representations
                 continue
 
             # If the user is following this thread already then put it in that
             # channel
             channel = "#/{}/".format(result.board)
-            print(self.board_watchers[result.board])
+            # TODO: Remove users who have disconnected from the server here
             for client in self.board_watchers[result.board]:
                 self._send_message(client, channel, result.summary,
                                    sending_nick=send_as)
