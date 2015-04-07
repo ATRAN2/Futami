@@ -2,6 +2,7 @@
 import os
 import tempfile
 
+
 class Channel(object):
     def __init__(self, server, name):
         self.server = server
@@ -62,5 +63,3 @@ class Channel(object):
 
     def __repr__(self):
         return "<{} {}>".format(self.__class__.__name__, self.name)
-
-

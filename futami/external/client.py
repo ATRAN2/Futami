@@ -1,10 +1,12 @@
 # -*- coding: utf8 -*-
 
 from collections import defaultdict
+from datetime import datetime
 from multiprocessing import SimpleQueue
 from multiprocessing import Process
 import logging
 import re
+import socket
 import time
 
 from futami.ami import Ami
@@ -27,6 +29,7 @@ _ircstring_translation = str.maketrans(
 
 def irc_lower(s):
     return str.translate(s, _ircstring_translation)
+
 
 class Client(object):
     __linesep_regexp = re.compile(r"\r?\n")
@@ -694,5 +697,3 @@ class InternalClient(Client):
 
         if sending_nick:
             self.nickname = real_nick
-
-

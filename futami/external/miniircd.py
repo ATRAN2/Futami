@@ -27,13 +27,10 @@ import select
 import ssl
 import socket
 import sys
-import tempfile
 import time
-from datetime import datetime
 from optparse import OptionParser
 
 
-from futami.external.channel import Channel
 from futami.external.client import Client
 from futami.external.client import InternalClient
 
