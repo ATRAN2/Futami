@@ -9,6 +9,7 @@ from multiprocessing import (
 )
 from time import sleep
 
+from retrying import retry
 import requests
 
 from futami.common import (
@@ -82,12 +83,14 @@ class Ami:
 
             self.update_request_queue.put(request)
 
+    @retry
     def get_board(self, board):
         url = THREAD_LIST.format(board=board)
         pages = requests.get(url).json()
         threads = list(flatten([page['threads'] for page in pages]))
         return threads
 
+    @retry
     def get_thread(self, board, thread):
         url = THREAD.format(board=board, thread=thread)
         posts = requests.get(url).json()['posts']

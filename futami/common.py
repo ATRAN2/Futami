@@ -27,11 +27,11 @@ class Image(namedtuple('Image', ['filename', 'tim', 'ext', 'fsize', 'md5', 'w',
 
     @property
     def image_url(self):
-        return
+        return Image.IMAGE.format(board=self.board, tim=self.tim, ext=self.ext)
 
     @property
     def thumb_url(self):
-        return
+        return Image.IMAGE_THUMB.format(board=self.board, tim=self.tim)
 
     @property
     def filesize(self):
@@ -41,6 +41,8 @@ class Image(namedtuple('Image', ['filename', 'tim', 'ext', 'fsize', 'md5', 'w',
         return "<Image {0}{1} ({2}x{3})>".format(self.filename, self.ext,
                                                  self.w, self.h)
 
+
+SUMMARY_MAX_WORDS = 15
 
 class Post:
     # Because moot is bad at updating the API documentation, the second
@@ -101,6 +103,8 @@ class Post:
 
     @property
     def image(self):
+        if not self.data['tim']:
+            return None
         return self._image
 
     def __repr__(self):
@@ -113,6 +117,24 @@ class Post:
     def comment(self):
         return self.clean(self.raw_comment)
 
+    @property
+    def summary(self):
+        if not self.comment:
+            words = '(no post text)'
+        else:
+            if '\n' in self.comment:
+                first_line, _ = self.comment.split('\n', 1)
+            else:
+                first_line = self.comment
+
+            words = first_line.split(' ')
+            ellipsis = '...' if len(words) > SUMMARY_MAX_WORDS else ''
+            words = ' '.join(words[:SUMMARY_MAX_WORDS]) + ellipsis
+
+        if self.image:
+            words = "[{}] {}".format(self.image.image_url, words)
+
+        return words
 
     def clean(self, text):
         if not text:

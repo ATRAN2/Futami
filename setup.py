@@ -20,6 +20,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'requests==2.6.0',
+        'retrying==1.3.3',
     ],
     tests_require=[
         'pep8==1.6.2',
