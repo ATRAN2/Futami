@@ -29,6 +29,7 @@ import socket
 import sys
 import tempfile
 import time
+from collections import defaultdict
 from datetime import datetime
 from optparse import OptionParser
 from multiprocessing import SimpleQueue
@@ -92,8 +93,6 @@ class Channel(object):
 
     def remove_client(self, client):
         self.members.discard(client)
-        if not self.members:
-            self.server.remove_channel(self)
 
     def _read_state(self):
         if not (self._state_path and os.path.exists(self._state_path)):
@@ -455,7 +454,6 @@ class Client(object):
                         True)
                     self.channel_log(channel, "left (%s)" % partmsg, meta=True)
                     del self.channels[irc_lower(channelname)]
-                    server.remove_member_from_channel(self, channelname)
 
         def ping_handler():
             if len(arguments) < 1:
@@ -689,16 +687,26 @@ class InternalClient(Client):
         self.request_queue = SimpleQueue()
         self.response_queue = SimpleQueue()
 
+        # dict of board => list of users
+        self.board_watchers = defaultdict(list)
+
         Process(target=Ami, args=(self.request_queue, self.response_queue)).start()
 
     def loop_hook(self):
         while not self.response_queue.empty():
             result = self.response_queue.get()
+            send_as = "/{}/{}".format(result.board, result.post_no)
             if hasattr(result, 'identifier'):
                 client, channel = result.identifier
                 client = self.server.get_client(client)
-                send_as = "/{}/{}".format(result.board, result.post_no)
 
+                self._send_message(client, channel, result.comment, sending_nick=send_as)
+                continue
+
+            # If the user is following this thread already then put it in that
+            # channel
+            channel = "#/{}/".format(result.board)
+            for client in self.board_watchers[result.board]:
                 self._send_message(client, channel, result.comment, sending_nick=send_as)
 
     def _parse_prefix(self, prefix):
@@ -748,6 +756,8 @@ class InternalClient(Client):
             ),
             (client.nickname, channel.name),
         ))
+
+        self.board_watchers[board_name].append(client)
 
     def _send_message(self, client, channel, message, sending_nick=None):
         if sending_nick:
