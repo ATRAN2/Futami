@@ -31,9 +31,17 @@ import tempfile
 import time
 from datetime import datetime
 from optparse import OptionParser
-from multiprocessing import Queue
+from multiprocessing import SimpleQueue
+from multiprocessing import Process
 
 from futami.ami import Ami
+from futami.common import (
+    Action,
+    BoardTarget,
+    SubscriptionUpdate,
+    Post,
+    ThreadTarget,
+)
 
 VERSION = "0.4"
 
@@ -287,7 +295,6 @@ class Client(object):
                 self.reply("366 %s %s :End of NAMES list"
                            % (self.nickname, channelname))
 
-                # Add the internal client first so he sees the join..
                 # You'd think it would make sense to add the internal client
                 # prior and let it handle the join,
                 # but what ends up happening is that it processes the join
@@ -296,10 +303,10 @@ class Client(object):
                 # internal client should really happen here, and if we can't
                 # act on the standard join we might as well alert the internal
                 # client separately.
-                channel.add_member(self.server.internal_client)
+                # Since we're doing this it doesn't make sense to actually add
+                # the internal client to the channel, it will just post spooky
+                # messages of its own accord.
                 self.server.internal_client.client_joined(self, channel)
-
-
 
         def list_handler():
 
@@ -663,6 +670,12 @@ class Client(object):
         return "<{} {}>".format(self.__class__.__name__, self.prefix)
 
 class InternalClient(Client):
+    """This client is a fake client which is responsible for firing off all messages
+    from the update notification side, and handling the routing of those messages to users watching.
+
+    It does not have a socket, so it should not be included in the server's clients dictionary.
+    """
+
     def __init__(self, server, nickname, user, host='localhost'):
         self.server = server
         self.nickname = nickname
@@ -672,12 +685,20 @@ class InternalClient(Client):
 
         self._readbuffer = ""
         self._writebuffer = ""
-        self.update_queue = Queue()
-        self.update_agent = Ami(self.update_queue)
+        self.request_queue = SimpleQueue()
+        self.response_queue = SimpleQueue()
+
+        Process(target=Ami, args=(self.request_queue, self.response_queue)).start()
 
     def loop_hook(self):
-        while not self.update_queue.empty():
-            result = self.update_queue.get()
+        while not self.response_queue.empty():
+            result = self.response_queue.get()
+            if hasattr(result, 'identifier'):
+                client, channel = result.identifier
+                client = self.server.get_client(client)
+                send_as = "/{}/{}".format(result.board, result.post_no)
+
+                self._send_message(client, channel, result.comment, sending_nick=send_as)
 
     def _parse_prefix(self, prefix):
         m = re.search(":(?P<nickname>[^!]*)!(?P<username>[^@]*)@(?P<host>.*)", prefix)
@@ -688,30 +709,44 @@ class InternalClient(Client):
         raise AttributeError('InternalClients have no sockets')
 
     def message(self, message):
-        prefix, message = message.split(" ", 1)
+        pass
+        # prefix, message = message.split(" ", 1)
 
-        prefix = self._parse_prefix(prefix)
+        # prefix = self._parse_prefix(prefix)
 
-        self.sending_client = self.server.get_client(prefix['nickname'])
+        # self.sending_client = self.server.get_client(prefix['nickname'])
 
-        self._readbuffer = message + '\r\n'
-        self._parse_read_buffer()
+        # self._readbuffer = message + '\r\n'
+        # self._parse_read_buffer()
 
     def _handle_command(self, command, arguments):
-        sending_client = self.sending_client
-        self.sending_client = None
+        # sending_client = self.sending_client
+        # self.sending_client = None
 
         # Add handling here for handling actual input from users other than
         # joins
+        pass
 
     def client_joined(self, client, channel):
-        self._send_message(client, channel.name, "Welcome to {}".format(channel.name))
-
         channel_name = channel.name[1:]
 
         if not (channel_name.startswith('/') and channel_name.endswith('/')):
-            self._send_message(client, channel.name, "This doesn't look like a board. Nothing will happen in this channel.")
+            self._send_message(client, channel.name, "This channel ({}) doesn't look like a board. Nothing will happen in this channel.".format(channel.name))
             return
+
+        self._send_message(
+            client, channel.name, "Welcome to {}, loading threads...".format(channel_name), sending_nick=channel_name,
+        )
+
+        board_name = channel_name[1:-1]
+
+        self.request_queue.put((
+            SubscriptionUpdate(
+                Action.LoadAndFollow,
+                BoardTarget(board_name),
+            ),
+            (client.nickname, channel.name),
+        ))
 
     def _send_message(self, client, channel, message, sending_nick=None):
         if sending_nick:

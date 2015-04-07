@@ -4,7 +4,7 @@ from collections import defaultdict
 from itertools import chain
 from operator import itemgetter
 from multiprocessing import (
-    Queue,
+    SimpleQueue,
     Process,
 )
 from time import sleep
@@ -12,7 +12,7 @@ import json
 
 import requests
 
-from common import (
+from futami.common import (
     Action,
     BoardTarget,
     SubscriptionUpdate,
@@ -29,49 +29,57 @@ def flatten(lst):
     return chain.from_iterable(lst)
 
 class Ami:
-    def __init__(self, response_queue):
+    def __init__(self, request_queue, response_queue):
+        self.request_queue = request_queue
         self.response_queue = response_queue
-        self.update_request_queue = Queue()
+        self.update_request_queue = SimpleQueue()
 
-        self.update_worker = Process(target=self.poll_for_updates)
-        self.update_worker.start()
+        Process(
+            target=self.update_loop,
+            args=(self.response_queue, self.update_request_queue),
+        ).start()
 
-    def request(self, request, identifier=None):
+        self.request_loop()
+
+    def request_loop(self):
         # The identifier argument is an opaque
         # identifier used by the queue client in some situations.
+        while True:
+            request, identifier = self.request_queue.get()
 
-        if request.action is Action.LoadAndFollow:
-            if isinstance(request.target, BoardTarget):
-                # Download all threads
-                board = request.target.board
-                threads = self.get_board(board)
+            if request.action is Action.LoadAndFollow:
+                if isinstance(request.target, BoardTarget):
+                    # Download all threads
+                    board = request.target.board
+                    threads = self.get_board(board)
 
-                # Seed seen_boards so the update loop doesn't re-fetch all of
-                # them
-                self.update_request_queue.put(SubscriptionUpdate(
-                    Action.InternalQueueUpdate,
-                    (board, {thread['no']: thread['last_modified'] for thread in threads})
-                ))
+                    # Seed seen_boards so the update loop doesn't re-fetch all of
+                    # them
+                    self.update_request_queue.put(SubscriptionUpdate(
+                        Action.InternalQueueUpdate,
+                        (board, {thread['no']: thread['last_modified'] for thread in threads})
+                    ))
 
-                threads.sort(key=itemgetter('last_modified'))
+                    threads.sort(key=itemgetter('last_modified'))
 
-                # Download all thread content so we can get the OP
-                for thread in threads:
-                    posts = list(self.get_thread(board, thread['no']))
-                    op = posts[0]
-                    op.identifier = identifier
+                    # Download all thread content so we can get the OP
+                    for thread in threads:
+                        posts = list(self.get_thread(board, thread['no']))
+                        op = posts[0]
+                        op.identifier = identifier
 
-                    self.response_queue.put(op)
+                        self.response_queue.put(op)
 
-            elif isinstance(request.target, ThreadTarget):
-                posts = list(self.get_thread(request.target.board, request.target.thread))
+                elif isinstance(request.target, ThreadTarget):
+                    posts = list(self.get_thread(request.target.board, request.target.thread))
 
-                for post in posts:
-                    post.identifier = identifier
+                    for post in posts:
+                        post.identifier = identifier
 
-                    self.response_queue.put(post)
+                        self.response_queue.put(post)
 
-        self.update_request_queue.put(request)
+            print("Submitting to update request queue")
+            self.update_request_queue.put(request)
 
     def get_board(self, board):
         url = THREAD_LIST.format(board=board)
@@ -90,7 +98,7 @@ class Ami:
 
         return posts
 
-    def poll_for_updates(self):
+    def update_loop(self, response_queue, update_request_queue):
         # List of boards that are watched
         watched_boards = set()
         # Dictionary of board => list of threads(string) that are watched
@@ -99,8 +107,8 @@ class Ami:
 
         while True:
             # Process pending update requests
-            while not self.update_request_queue.empty():
-                request = self.update_request_queue.get()
+            while not update_request_queue.empty():
+                request = update_request_queue.get()
                 if request.action is Action.LoadAndFollow:
                     if isinstance(request.target, BoardTarget):
                         # The InternalQueueUpdate the is fired _before_ this
@@ -124,10 +132,10 @@ class Ami:
                 for thread_no, last_modified in threads.items():
                     if thread_no not in seen_boards[board]:
                         thread = list(self.get_thread(board, thread_no))[0]
-                        self.response_queue.put(thread)
+                        response_queue.put(thread)
                     elif last_modified > seen_boards[board][thread_no]:
                         thread = list(self.get_thread(board, thread_no))[0]
-                        self.response_queue.put(thread)
+                        response_queue.put(thread)
                     elif last_modified < seen_boards[board][thread_no]:
                         # Sometimes we get stale data immediately after reading
                         # it (tested under SLEEP_TIME = 3). Ignore this data.
