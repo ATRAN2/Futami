@@ -114,9 +114,9 @@ class Channel(object):
         fp.close()
         os.rename(path, self._state_path)
 
-
     def __repr__(self):
         return "<{} {}>".format(self.__class__.__name__, self.name)
+
 
 class Client(object):
     __linesep_regexp = re.compile(r"\r?\n")
@@ -669,6 +669,7 @@ class Client(object):
     def __repr__(self):
         return "<{} {}>".format(self.__class__.__name__, self.prefix)
 
+
 class InternalClient(Client):
     """This client is a fake client which is responsible for firing off all messages
     from the update notification side, and handling the routing of those messages to users watching.
@@ -763,8 +764,8 @@ class InternalClient(Client):
         if sending_nick:
             self.nickname = real_nick
 
-class Server(object):
 
+class Server(object):
     def __init__(self, options):
         if options.debug:
             logger.setLevel(logging.DEBUG)
@@ -795,7 +796,6 @@ class Server(object):
             create_directory(self.statedir)
 
         self.internal_client = InternalClient(self, 'control', 'ControlUser')
-
 
     def daemonize(self):
         try:
@@ -880,9 +880,7 @@ class Server(object):
 
         self.run_loop()
 
-
     def run_loop(self):
-
         while True:
             self.internal_client.loop_hook()
 

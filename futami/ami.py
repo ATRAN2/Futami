@@ -8,7 +8,6 @@ from multiprocessing import (
     Process,
 )
 from time import sleep
-import json
 
 import requests
 
@@ -25,8 +24,10 @@ SLEEP_TIME = 3  # seconds
 THREAD_LIST = "https://a.4cdn.org/{board}/threads.json"
 THREAD = "https://a.4cdn.org/{board}/res/{thread}.json"
 
+
 def flatten(lst):
     return chain.from_iterable(lst)
+
 
 class Ami:
     def __init__(self, request_queue, response_queue):
@@ -160,6 +161,3 @@ if __name__ == "__main__":
     ami = Ami(response_queue)
     ami.request(request)
     # ami.request(request2)
-
-
-

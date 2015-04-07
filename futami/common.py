@@ -9,6 +9,7 @@ BoardTarget = namedtuple('BoardTarget', ['board'])
 
 ThreadTarget = namedtuple('ThreadTarget', ['board', 'thread'])
 
+
 class Action(enum.Enum):
     LoadAndFollow = 1
     Stop = 2
@@ -41,10 +42,10 @@ class Post:
     # listed in the API documentation.
     # The third set of fields are values that are synthesized by us.
     post_fields = [
-        'no', 'resto', 'sticky', 'closed', 'now', 'time', 'name', 'trip', \
-        'filename', 'id', 'capcode', 'country', 'country_name', 'email', 'sub', 'com', 'tim', \
-        'ext', 'fsize', 'md5', 'w', 'h', 'tn_w', 'tn_h', 'filedeleted', 'spoiler', \
-        'custom_spoiler', 'omitted_posts', 'omitted_images', 'replies', 'images', \
+        'no', 'resto', 'sticky', 'closed', 'now', 'time', 'name', 'trip',
+        'filename', 'id', 'capcode', 'country', 'country_name', 'email', 'sub', 'com', 'tim',
+        'ext', 'fsize', 'md5', 'w', 'h', 'tn_w', 'tn_h', 'filedeleted', 'spoiler',
+        'custom_spoiler', 'omitted_posts', 'omitted_images', 'replies', 'images',
         'bumplimit', 'imagelimit', 'capcode_replies', 'last_modified', 'tag', 'semantic_url',
 
         'unique_ips',
