@@ -42,6 +42,7 @@ class Ami:
 
         self.request_loop()
 
+    # Loop to handle fast part of LoadAndFollow and other requests from IRC
     def request_loop(self):
         # The identifier argument is an opaque
         # identifier used by the queue client in some situations.
@@ -99,6 +100,7 @@ class Ami:
 
         return posts
 
+    # Timed loop to hit 4chan API
     def update_loop(self, response_queue, update_request_queue):
         # List of boards that are watched
         watched_boards = set()
@@ -151,13 +153,3 @@ class Ami:
             seen_boards = pending_boards
 
             sleep(SLEEP_TIME)
-
-if __name__ == "__main__":
-
-    request = SubscriptionUpdate(Action.LoadAndFollow, BoardTarget('a'))
-    # request2 = SubscriptionUpdate(Action.LoadAndFollow, ThreadTarget('jp', 13265004))
-    response_queue = Queue()
-
-    ami = Ami(response_queue)
-    ami.request(request)
-    # ami.request(request2)
