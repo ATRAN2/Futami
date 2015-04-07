@@ -55,8 +55,7 @@ class Ami:
                     board = request.target.board
                     threads = self.get_board(board)
 
-                    # Seed seen_boards so the update loop doesn't re-fetch all of
-                    # them
+                    # Seed seen_boards so update_loop doesn't re-fetch them
                     self.update_request_queue.put(SubscriptionUpdate(
                         Action.InternalQueueUpdate,
                         (board, {thread['no']: thread['last_modified'] for thread in threads})
@@ -73,7 +72,8 @@ class Ami:
                         self.response_queue.put(op)
 
                 elif isinstance(request.target, ThreadTarget):
-                    posts = list(self.get_thread(request.target.board, request.target.thread))
+                    posts = list(self.get_thread(request.target.board,
+                                                 request.target.thread))
 
                     for post in posts:
                         post.identifier = identifier
@@ -128,7 +128,10 @@ class Ami:
             # Fetch pending boards
             pending_boards = defaultdict(dict)
             for board in watched_boards:
-                pending_boards[board] = {thread['no']: thread['last_modified'] for thread in self.get_board(board)}
+                pending_boards[board] = {
+                    thread['no']:
+                    thread['last_modified'] for thread in self.get_board(board)
+                }
 
             to_delete = []
             for board, threads in pending_boards.items():

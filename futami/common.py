@@ -17,7 +17,8 @@ class Action(enum.Enum):
     InternalQueueUpdate = 100
 
 
-class Image(namedtuple('Image', ['filename', 'tim', 'ext', 'fsize', 'md5', 'w', 'h', 'tn_w', 'tn_h', 'board'])):
+class Image(namedtuple('Image', ['filename', 'tim', 'ext', 'fsize', 'md5', 'w',
+                                 'h', 'tn_w', 'tn_h', 'board'])):
     IMAGE = "https://i.4cdn.org/{board}/src/{tim}{ext}"
     IMAGE_THUMB = "https://t.4cdn.org/{board}/thumb/{tim}s.jpg"
 
@@ -34,19 +35,21 @@ class Image(namedtuple('Image', ['filename', 'tim', 'ext', 'fsize', 'md5', 'w', 
         return self.fsize
 
     def __repr__(self):
-        return "<Image {0}{1} ({2}x{3})>".format(self.filename, self.ext, self.w, self.h)
+        return "<Image {0}{1} ({2}x{3})>".format(self.filename, self.ext,
+                                                 self.w, self.h)
 
 
 class Post:
-    # Because moot is bad at updating the API documentation, the second set of fields are not
-    # listed in the API documentation.
+    # Because moot is bad at updating the API documentation, the second
+    # set of fields are not listed in the API documentation.
     # The third set of fields are values that are synthesized by us.
     post_fields = [
         'no', 'resto', 'sticky', 'closed', 'now', 'time', 'name', 'trip',
-        'filename', 'id', 'capcode', 'country', 'country_name', 'email', 'sub', 'com', 'tim',
-        'ext', 'fsize', 'md5', 'w', 'h', 'tn_w', 'tn_h', 'filedeleted', 'spoiler',
-        'custom_spoiler', 'omitted_posts', 'omitted_images', 'replies', 'images',
-        'bumplimit', 'imagelimit', 'capcode_replies', 'last_modified', 'tag', 'semantic_url',
+        'filename', 'id', 'capcode', 'country', 'country_name', 'email', 'sub',
+        'com', 'tim', 'ext', 'fsize', 'md5', 'w', 'h', 'tn_w', 'tn_h',
+        'filedeleted', 'spoiler', 'custom_spoiler', 'omitted_posts',
+        'omitted_images', 'replies', 'images', 'bumplimit', 'imagelimit',
+        'capcode_replies', 'last_modified', 'tag', 'semantic_url',
 
         'unique_ips',
 

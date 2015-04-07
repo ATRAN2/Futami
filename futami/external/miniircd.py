@@ -294,17 +294,17 @@ class Client(object):
                 self.reply("366 %s %s :End of NAMES list"
                            % (self.nickname, channelname))
 
-                # You'd think it would make sense to add the internal client
-                # prior and let it handle the join,
-                # but what ends up happening is that it processes the join
-                # and sends a welcome privmsg before we even finish the
-                # bookkeeping, confusing the client. Informing the
-                # internal client should really happen here, and if we can't
-                # act on the standard join we might as well alert the internal
-                # client separately.
-                # Since we're doing this it doesn't make sense to actually add
-                # the internal client to the channel, it will just post spooky
-                # messages of its own accord.
+                # You'd think it would make sense to add the internal
+                # client prior and let it handle the join,
+                # but what ends up happening is that it processes the
+                # join and sends a welcome privmsg before we even
+                # finish the bookkeeping, confusing the client.
+                # Informing the internal client should really happen
+                # here, and if we can't act on the standard join we
+                # might as well alert the internal client separately.
+                # Since we're doing this it doesn't make sense to
+                # actually add the internal client to the channel, it
+                # will just post spooky messages of its own accord.
                 self.server.internal_client.client_joined(self, channel)
 
         def list_handler():
@@ -669,10 +669,12 @@ class Client(object):
 
 
 class InternalClient(Client):
-    """This client is a fake client which is responsible for firing off all messages
-    from the update notification side, and handling the routing of those messages to users watching.
+    """This client is a fake client which is responsible for firing off
+    all messages from the update notification side, and handling the
+    routing of those messages to users watching.
 
-    It does not have a socket, so it should not be included in the server's clients dictionary.
+    It does not have a socket, so it should not be included in the
+    server's clients dictionary.
     """
 
     def __init__(self, server, nickname, user, host='localhost'):
@@ -690,7 +692,10 @@ class InternalClient(Client):
         # dict of board => list of users
         self.board_watchers = defaultdict(list)
 
-        Process(target=Ami, args=(self.request_queue, self.response_queue)).start()
+        Process(
+            target=Ami,
+            args=(self.request_queue, self.response_queue)
+        ).start()
 
     def loop_hook(self):
         while not self.response_queue.empty():
@@ -700,17 +705,22 @@ class InternalClient(Client):
                 client, channel = result.identifier
                 client = self.server.get_client(client)
 
-                self._send_message(client, channel, result.comment, sending_nick=send_as)
+                self._send_message(client, channel, result.comment,
+                                   sending_nick=send_as)
                 continue
 
             # If the user is following this thread already then put it in that
             # channel
             channel = "#/{}/".format(result.board)
             for client in self.board_watchers[result.board]:
-                self._send_message(client, channel, result.comment, sending_nick=send_as)
+                self._send_message(client, channel, result.comment,
+                                   sending_nick=send_as)
 
     def _parse_prefix(self, prefix):
-        m = re.search(":(?P<nickname>[^!]*)!(?P<username>[^@]*)@(?P<host>.*)", prefix)
+        m = re.search(
+            ":(?P<nickname>[^!]*)!(?P<username>[^@]*)@(?P<host>.*)",
+            prefix
+        )
         return m.groupdict()
 
     @property
@@ -732,8 +742,7 @@ class InternalClient(Client):
         # sending_client = self.sending_client
         # self.sending_client = None
 
-        # Add handling here for handling actual input from users other than
-        # joins
+        # Add handling here for actual input from users other than joins
         pass
 
     def client_joined(self, client, channel):
@@ -744,7 +753,9 @@ class InternalClient(Client):
             return
 
         self._send_message(
-            client, channel.name, "Welcome to {}, loading threads...".format(channel_name), sending_nick=channel_name,
+            client, channel.name,
+            "Welcome to {}, loading threads...".format(channel_name),
+            sending_nick=channel_name,
         )
 
         board_name = channel_name[1:-1]
@@ -769,7 +780,8 @@ class InternalClient(Client):
                 self.prefix,
                 channel,
                 message,
-        ))
+            )
+        )
 
         if sending_nick:
             self.nickname = real_nick
@@ -893,7 +905,10 @@ class Server(object):
     def run_loop(self):
         while True:
             queue_pseudo_socket = self.internal_client.response_queue._reader
-            client_sockets = [client.socket for client in list(self.clients.values())]
+            client_sockets = [
+                client.socket
+                for client in list(self.clients.values())
+            ]
             (readable_sockets, writable_sockets, _) = select.select(
                 self.server_sockets + client_sockets + [queue_pseudo_socket],
                 [client.socket for client in list(self.clients.values())
