@@ -80,7 +80,6 @@ class Ami:
 
                         self.response_queue.put(post)
 
-            print("Submitting to update request queue")
             self.update_request_queue.put(request)
 
     def get_board(self, board):

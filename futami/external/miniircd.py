@@ -615,11 +615,8 @@ class Client(object):
 
     def message_channel(self, channel, command, message, include_self=False):
         line = ":%s %s %s" % (self.prefix, command, message)
-        print(channel.members)
         for client in channel.members:
-            print(self, client, client != self)
             if client != self or include_self:
-                print("Messaging", client)
                 client.message(line)
 
     def channel_log(self, channel, message, meta=False):
@@ -699,7 +696,7 @@ class InternalClient(Client):
         while not self.response_queue.empty():
             result = self.response_queue.get()
             send_as = "/{}/{}".format(result.board, result.post_no)
-            if hasattr(result, 'identifier'):
+            if result.identifier:
                 client, channel = result.identifier
                 client = self.server.get_client(client)
 

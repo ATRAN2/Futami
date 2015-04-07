@@ -70,6 +70,8 @@ class Post:
         'board': 'board',
     }
 
+    identifier = None
+
     def __init__(self, data):
         missing_fields = set(self.post_fields).difference(data.keys())
         data.update({field: None for field in missing_fields})
