@@ -882,16 +882,18 @@ class Server(object):
 
     def run_loop(self):
         while True:
-            self.internal_client.loop_hook()
-
+            queue_pseudo_socket = self.internal_client.response_queue._reader
             client_sockets = [client.socket for client in list(self.clients.values())]
             (readable_sockets, writable_sockets, _) = select.select(
-                self.server_sockets + client_sockets,
+                self.server_sockets + client_sockets + [queue_pseudo_socket],
                 [client.socket for client in list(self.clients.values())
                  if client.write_queue_size() > 0],
                 [],
-                10
             )
+
+            if queue_pseudo_socket in readable_sockets:
+                self.internal_client.loop_hook()
+                readable_sockets.remove(queue_pseudo_socket)
 
             for client in readable_sockets:
                 if client in self.clients:
