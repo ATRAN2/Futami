@@ -5,6 +5,30 @@ from html.parser import HTMLParser
 import enum
 import re
 
+SUMMARY_MAX_WORDS = 15
+
+BOARD_TO_DESCRIPTION = {
+    'a': 'Anime & Manga',
+    'b': 'Random',
+    'c': 'Anime/Cute',
+    'cgl': 'Cosplay & EGL',
+    'cm': 'Cute/Male',
+    'fa': 'Fashion',
+    'fit': 'Health & Fitness',
+    'g': 'Technology',
+    'o': 'Auto',
+    'p': 'Photography',
+    'po': 'Papercraft & Origami',
+    'pol': 'Politics',  # CHECK
+    'sci': 'Science',  # CHECK
+    'sp': 'Sports',
+    'tg': 'Traditional Games',
+    'tv': 'Television & Film',
+    'u': 'Yuri',
+    'v': 'Video Games',
+    'vg': 'Video Game Generals', # CHECK
+    'vp': 'Pokemon',
+}
 unescape = HTMLParser().unescape
 
 SubscriptionUpdate = namedtuple('SubscriptionUpdate', ['action', 'target'])
@@ -41,8 +65,6 @@ class Image(namedtuple('Image', ['filename', 'tim', 'ext', 'fsize', 'md5', 'w',
         return "<Image {0}{1} ({2}x{3})>".format(self.filename, self.ext,
                                                  self.w, self.h)
 
-
-SUMMARY_MAX_WORDS = 15
 
 class Post:
     # Because moot is bad at updating the API documentation, the second

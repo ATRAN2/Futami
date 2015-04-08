@@ -13,6 +13,7 @@ from futami.ami import Ami
 from futami.common import (
     Action,
     BoardTarget,
+    BOARD_TO_DESCRIPTION,
     SubscriptionUpdate,
 )
 from futami.external.channel import Channel
@@ -191,6 +192,7 @@ class Client(object):
                     continue
 
                 channel.add_member(self)
+                channel.topic = BOARD_TO_DESCRIPTION[channelname[2:-1]]
                 self.channels[irc_lower(channelname)] = channel
                 self.message_channel(channel, "JOIN", channelname, True)
                 self.channel_log(channel, "joined", meta=True)
