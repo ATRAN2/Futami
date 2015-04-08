@@ -192,7 +192,10 @@ class Client(object):
                     continue
 
                 channel.add_member(self)
-                channel.topic = BOARD_TO_DESCRIPTION[channelname[2:-1]]
+
+                boardname = channelname[2:-1]
+                if boardname in BOARD_TO_DESCRIPTION:
+                    channel.topic = BOARD_TO_DESCRIPTION[boardname]
                 self.channels[irc_lower(channelname)] = channel
                 self.message_channel(channel, "JOIN", channelname, True)
                 self.channel_log(channel, "joined", meta=True)
