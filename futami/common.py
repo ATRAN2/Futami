@@ -8,26 +8,49 @@ import re
 SUMMARY_MAX_WORDS = 15
 
 BOARD_TO_DESCRIPTION = {
+    '3': '3DCG',
     'a': 'Anime & Manga',
+    'an': 'Animals & Nature',
+    'asp': 'Alternative Sports',
     'b': 'Random',
+    'biz': 'Business & Finance',
     'c': 'Anime/Cute',
+    'co': 'Comics & Cartoons',
     'cgl': 'Cosplay & EGL',
+    'ck': 'Cooking',
     'cm': 'Cute/Male',
+    'diy': 'Do-It-Yourself',
+    'f': 'Flash',
     'fa': 'Fashion',
     'fit': 'Health & Fitness',
     'g': 'Technology',
+    'gd': 'Graphic Design',
+    'i': 'Oekaki',
+    'ic': 'Artwork/Critique',
+    'int': 'International',
+    'jp': 'Otaku Culture',
+    'k': 'Weapons',
+    'm': 'Mecha',
+    'mu': 'Music',
+    'n': 'Transportation',
     'o': 'Auto',
+    'out': 'Outdoors',
     'p': 'Photography',
     'po': 'Papercraft & Origami',
-    'pol': 'Politics',  # CHECK
-    'sci': 'Science',  # CHECK
+    'pol': 'Politically Incorrect',
+    'sci': 'Science & Math',
     'sp': 'Sports',
     'tg': 'Traditional Games',
+    'toy': 'Toys',
     'tv': 'Television & Film',
     'u': 'Yuri',
     'v': 'Video Games',
-    'vg': 'Video Game Generals', # CHECK
+    'vg': 'Video Game Generals',
     'vp': 'Pokemon',
+    'vr': 'Retro Games',
+    'w': 'Anime/Wallpapers',
+    'wg': 'Wallpapers/General',
+    'wsg': 'Worksafe GIF',
 }
 unescape = HTMLParser().unescape
 
