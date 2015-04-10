@@ -66,6 +66,8 @@ BoardTarget = namedtuple('BoardTarget', ['board'])
 
 ThreadTarget = namedtuple('ThreadTarget', ['board', 'thread'])
 
+StoredException = namedtuple('StoredException', ['traceback', 'process'])
+
 class Action(enum.Enum):
     LoadAndFollow = 1
     Stop = 2

@@ -14,6 +14,7 @@ from futami.common import (
     Action,
     BoardTarget,
     BOARD_TO_DESCRIPTION,
+    StoredException,
     SubscriptionUpdate,
     ThreadTarget,
 )
@@ -615,12 +616,22 @@ class InternalClient(Client):
 
         Process(
             target=Ami,
+            name='immediate api worker',
             args=(self.request_queue, self.response_queue)
         ).start()
 
     def loop_hook(self):
         while not self.response_queue.empty():
             result = self.response_queue.get()
+
+            # Handle exceptions in-band from child workers here.
+            if isinstance(result, StoredException):
+                print(result.traceback)
+                raise RuntimeError(
+                    "Exception caught from worker '{}', see above for exception details".format(
+                        result.process,
+                ))
+
             logger.debug("read from response queue {}".format(result))
 
             send_as = "/{}/{}".format(result.board, result.post_no)

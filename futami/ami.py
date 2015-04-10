@@ -2,13 +2,17 @@
 
 from collections import defaultdict
 from itertools import chain
+from functools import wraps
 from operator import itemgetter
 from multiprocessing import (
+    current_process,
     SimpleQueue,
     Process,
 )
 from time import sleep
 import logging
+import sys
+import traceback
 
 from retrying import retry
 import requests
@@ -17,6 +21,7 @@ from futami.common import (
     Action,
     BoardTarget,
     SubscriptionUpdate,
+    StoredException,
     Post,
     ThreadTarget,
 )
@@ -42,6 +47,7 @@ class Ami:
 
         Process(
             target=self.update_loop,
+            name='periodic api worker',
             args=(response_queue, self.update_request_queue),
         ).start()
 
@@ -49,7 +55,24 @@ class Ami:
 
         self.request_loop()
 
+    def proxy_exception_to(instance_attribute_exception_proxy_queue):
+        def _proxy_exception(f):
+            """This isn't your normal-looking function.
+            """
+            @wraps(f)
+            def wrapper(self, *args, **kwargs):
+                try:
+                    return f(self, *args, **kwargs)
+                except BaseException as ex:
+                    queue = getattr(self, instance_attribute_exception_proxy_queue)
+                    tb = traceback.format_exc()
+                    this_process = current_process()
+                    queue.put(StoredException(tb, this_process.name))
+            return wrapper
+        return _proxy_exception
+
     # Loop to handle fast part of LoadAndFollow and other requests from IRC
+    @proxy_exception_to("response_queue")
     def request_loop(self):
         # The identifier argument is an opaque
         # identifier used by the queue client in some situations.
@@ -117,6 +140,7 @@ class Ami:
         return posts
 
     # Timed loop to hit 4chan API
+    @proxy_exception_to("response_queue")
     def update_loop(self, response_queue, update_request_queue):
         # Set of boards that are watched
         watched_boards = set()
