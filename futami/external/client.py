@@ -661,7 +661,6 @@ class InternalClient(Client):
                 logger.debug("sending reply to channel {}".format(channel))
 
                 # TODO: Remove users who have disconnected from the server here
-                logger.debug("{} {} {} {}".format(self.thread_watchers, result.board, result.reply_to, self.thread_watchers[result.board][result.reply_to]))
                 for client in self.thread_watchers[result.board][result.reply_to]:
                     logger.debug("sending reply to {}".format(client))
                     self._send_message(
