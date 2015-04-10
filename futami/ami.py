@@ -99,7 +99,7 @@ class Ami:
                     for thread in threads:
                         posts = list(self.get_thread(board, thread['no']))
                         op = posts[0]
-                        op.identifier = request.identifier
+                        op.payload = request.payload
 
                         self.response_queue.put(op)
 
@@ -116,7 +116,7 @@ class Ami:
                     ))
 
                     for post in posts:
-                        post.identifier = request.identifier
+                        post.payload = request.payload
 
                         self.response_queue.put(post)
 
@@ -159,11 +159,11 @@ class Ami:
                 if request.action is Action.InternalQueueUpdate:
                     if isinstance(request.target, BoardTarget):
                         watched_boards.add(request.target.board)
-                        seen_boards[board] = request.target.payload
+                        seen_boards[board] = request.payload
                     elif isinstance(request.target, ThreadTarget):
                         # assert request.target.board in watched_boards, "Asked to watch a thread of a board not currently being watched"
                         watched_threads[request.target.board].add(request.target.thread)
-                        seen_threads[request.target.board][request.target.thread] = request.target.payload
+                        seen_threads[request.target.board][request.target.thread] = request.payload
 
             # Fetch pending boards
             pending_boards = defaultdict(dict)

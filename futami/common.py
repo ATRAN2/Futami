@@ -54,7 +54,7 @@ BOARD_TO_DESCRIPTION = {
 }
 unescape = HTMLParser().unescape
 
-class SubscriptionUpdate(namedtuple('SubscriptionUpdate', ['action', 'target', 'identifier'])):
+class SubscriptionUpdate(namedtuple('SubscriptionUpdate', ['action', 'target', 'payload'])):
     @classmethod
     def make(cls, action, target, payload=None):
         """Make a Subscription with optional payload. This payload has no intrinsic meaning
