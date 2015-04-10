@@ -54,7 +54,13 @@ BOARD_TO_DESCRIPTION = {
 }
 unescape = HTMLParser().unescape
 
-SubscriptionUpdate = namedtuple('SubscriptionUpdate', ['action', 'target'])
+class SubscriptionUpdate(namedtuple('SubscriptionUpdate', ['action', 'target', 'identifier'])):
+    @classmethod
+    def make(cls, action, target, payload=None):
+        """Make a Subscription with optional payload. This payload has no intrinsic meaning
+        to a SubscriptionUpdate and its use may depend on the queue producer and consumer.
+        """
+        return cls(action, target, payload)
 
 BoardTarget = namedtuple('BoardTarget', ['board'])
 
@@ -146,12 +152,6 @@ class Post:
             name,
         ))
 
-    @property
-    def image(self):
-        if not self.data['tim']:
-            return None
-        return self._image
-
     def __repr__(self):
         return "<Post {0}/{1}>".format(self.board, self.post_no)
 
@@ -160,26 +160,47 @@ class Post:
 
     @property
     def comment(self):
-        return self.clean(self.raw_comment)
+        comment = self.clean(self.raw_comment)
+
+        if self.image:
+            comment = "[{}] {}".format(self.image.image_url, comment)
+
+        return comment
 
     @property
     def summary(self):
-        if not self.comment:
-            words = '(no post text)'
+        comment = self.clean(self.raw_comment)
+
+        if not comment:
+            comment = '(no post text)'
         else:
-            if '\n' in self.comment:
-                first_line, _ = self.comment.split('\n', 1)
+            if '\n' in comment:
+                first_line, _ = comment.split('\n', 1)
             else:
-                first_line = self.comment
+                first_line = comment
 
             words = first_line.split(' ')
             ellipsis = '...' if len(words) > SUMMARY_MAX_WORDS else ''
             words = ' '.join(words[:SUMMARY_MAX_WORDS]) + ellipsis
 
         if self.image:
-            words = "[{}] {}".format(self.image.image_url, words)
+            comment = "[{}] {}".format(self.image.image_url, comment)
 
-        return words
+        return comment
+
+    @property
+    def image(self):
+        if not self.data['tim']:
+            return None
+        return self._image
+
+    @property
+    def is_reply(self):
+        """Posts whose backing 'resto' property is 0 are OPs.
+        This is important for the response queue handler to use this property
+        as a rudimentary routing mechanism.
+        """
+        return self.reply_to != 0
 
     def clean(self, text):
         if not text:

@@ -130,9 +130,6 @@ class Server(object):
             del self.nicknames[irc_lower(client.nickname)]
         del self.clients[client.socket]
 
-    def remove_channel(self, channel):
-        del self.channels[irc_lower(channel.name)]
-
     def start(self):
         self.server_sockets = []
         for port in self.ports:
@@ -169,7 +166,7 @@ class Server(object):
             (readable_sockets, writable_sockets, _) = select.select(
                 self.server_sockets + client_sockets + [queue_pseudo_socket],
                 [client.socket for client in list(self.clients.values())
-                 if client.write_queue_size() > 0],
+                if client.write_queue_size() > 0],
                 [],
             )
 

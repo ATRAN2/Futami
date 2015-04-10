@@ -15,12 +15,14 @@ from futami.common import (
     BoardTarget,
     BOARD_TO_DESCRIPTION,
     SubscriptionUpdate,
+    ThreadTarget,
 )
 from futami.external.channel import Channel
 
 VERSION = "0.4"
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 _alpha = "abcdefghijklmnopqrstuvwxyz"
 _ircstring_translation = str.maketrans(
@@ -608,6 +610,9 @@ class InternalClient(Client):
         # dict of board => list of users
         self.board_watchers = defaultdict(list)
 
+        # dict of board, thread => list of users
+        self.thread_watchers = defaultdict(lambda: defaultdict(list))
+
         Process(
             target=Ami,
             args=(self.request_queue, self.response_queue)
@@ -616,22 +621,52 @@ class InternalClient(Client):
     def loop_hook(self):
         while not self.response_queue.empty():
             result = self.response_queue.get()
+            logger.debug("read from response queue {}".format(result))
+
             send_as = "/{}/{}".format(result.board, result.post_no)
+
+            # Initial channel loads have identifiers, use them to find out
+            # where to go
             if result.identifier:
-                client, channel = result.identifier
+                client, channel, target = result.identifier
                 client = self.server.get_client(client)
+                logger.debug("initial channel load, using identitifier info: sending to {} on {}".format(client, channel))
 
-                self._send_message(client, channel, result.summary,
-                                   sending_nick=send_as)
-                continue
+                if isinstance(target, BoardTarget):
+                    self._send_message(
+                        client, channel, result.summary,
+                        sending_nick=send_as,
+                    )
+                    continue
+                elif isinstance(target, ThreadTarget):
+                    self._send_message(
+                        client, channel, result.comment,
+                        sending_nick=send_as,
+                    )
+                    continue
 
-            # If the user is following this thread already then put it in that
-            # channel
-            channel = "#/{}/".format(result.board)
-            # TODO: Remove users who have disconnected from the server here
-            for client in self.board_watchers[result.board]:
-                self._send_message(client, channel, result.summary,
-                                   sending_nick=send_as)
+            if result.is_reply:  # Send to thread channel
+                channel = "#/{}/{}".format(result.board, result.reply_to)
+                logger.debug("sending reply to channel {}".format(channel))
+
+                # TODO: Remove users who have disconnected from the server here
+                logger.debug("{} {} {} {}".format(self.thread_watchers, result.board, result.reply_to, self.thread_watchers[result.board][result.reply_to]))
+                for client in self.thread_watchers[result.board][result.reply_to]:
+                    logger.debug("sending reply to {}".format(client))
+                    self._send_message(
+                        client, channel, result.comment,
+                        sending_nick=send_as,
+                    )
+            else:
+                channel = "#/{}/".format(result.board)
+                logger.debug("sending thread update to channel {}".format(channel))
+
+                # TODO: Remove users who have disconnected from the server here
+                for client in self.board_watchers[result.board]:
+                    self._send_message(
+                        client, channel, result.summary,
+                        sending_nick=send_as,
+                    )
 
     def _parse_prefix(self, prefix):
         m = re.search(
@@ -655,6 +690,30 @@ class InternalClient(Client):
         # self._readbuffer = message + '\r\n'
         # self._parse_read_buffer()
 
+    def client_joined(self, client, channel):
+        logger.debug("InternalClient handling {} joined {}".format(client, channel))
+
+        channel_registration_map = {
+            r'#/(.+)/$': self._client_register_board,
+            r'#/(.+)/(\d+)$': self._client_register_thread,
+        }
+
+        matched_registration = False
+
+        for regex, register_method in channel_registration_map.items():
+            m = re.match(regex, channel.name)
+            if m:
+                register_method(client, channel, *m.groups())
+                matched_registration = True
+                break
+
+        if not matched_registration:
+            self._send_message(
+                client, channel.name,
+                "This channel ({}) doesn't look like a board. Nothing will happen in this channel.".format(channel.name)
+            )
+            return
+
     def _handle_command(self, command, arguments):
         # sending_client = self.sending_client
         # self.sending_client = None
@@ -662,30 +721,49 @@ class InternalClient(Client):
         # Add handling here for actual input from users other than joins
         pass
 
-    def client_joined(self, client, channel):
-        channel_name = channel.name[1:]
+    def _client_register_board(self, client, channel, board):
+        logger.debug("registering to board: {}, {}, {}".format(client, channel, board))
 
-        if not (channel_name.startswith('/') and channel_name.endswith('/')):
-            self._send_message(client, channel.name, "This channel ({}) doesn't look like a board. Nothing will happen in this channel.".format(channel.name))
-            return
+        slash_board = '/{}/'.format(board)
+        self._send_message(
+            client, channel.name,
+            "Welcome to {}, loading threads...".format(slash_board),
+            sending_nick=slash_board,
+        )
+
+        target = BoardTarget(board)
+
+        self.request_queue.put(
+            SubscriptionUpdate.make(
+                action=Action.LoadAndFollow,
+                target=target,
+                payload=(client.nickname, channel.name, target),
+        ))
+
+        self.board_watchers[board].append(client)
+
+    def _client_register_thread(self, client, channel, board, thread):
+        logging.debug("registering to thread: {}, {}, {}, {}".format(client, channel, board, thread))
+
+        slash_board_thread = '/{}/{}'.format(board, thread)
 
         self._send_message(
             client, channel.name,
-            "Welcome to {}, loading threads...".format(channel_name),
-            sending_nick=channel_name,
+            "Welcome to >>>{}, loading posts...".format(slash_board_thread),
+            sending_nick=slash_board_thread,
         )
 
-        board_name = channel_name[1:-1]
+        target = ThreadTarget(board, thread)
 
-        self.request_queue.put((
-            SubscriptionUpdate(
-                Action.LoadAndFollow,
-                BoardTarget(board_name),
-            ),
-            (client.nickname, channel.name),
+        self.request_queue.put(
+            SubscriptionUpdate.make(
+                action=Action.LoadAndFollow,
+                target=target,
+                payload=(client.nickname, channel.name, target),
         ))
 
-        self.board_watchers[board_name].append(client)
+        # Thread reply_tos are ints when they come back from the API
+        self.thread_watchers[board][int(thread)].append(client)
 
     def _send_message(self, client, channel, message, sending_nick=None):
         if sending_nick:
